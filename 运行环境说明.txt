@@ -1,0 +1,39 @@
+MediaWorkbench 运行环境说明
+========================
+
+一、本机已编译好的程序在哪用
+------------------------
+直接进入本目录下：
+
+  build_vs\Debug\
+
+双击即可运行：
+
+  media_workbench.exe     主程序（三个工作台都在这里）
+  video_demo.exe          只跑视频模块
+  audio_demo.exe          只跑音频模块
+  frame_demo.exe          只跑图像模块
+
+一般交作业 / 演示：打开 media_workbench.exe 即可。
+
+
+二、运行需要的环境
+----------------
+1. 操作系统：Windows 64 位（本项目按 Win10/Win11 调试）
+2. 已按 Debug 配置编译并做过 Qt 部署，同目录下应有 Qt 相关 dll
+   （若提示缺 dll，说明 build_vs\Debug 不完整，需在原开发机上重新编译部署）
+3. FFmpeg：导出视频/音频、截帧、波形分析会调用本机 ffmpeg
+   - 把 ffmpeg 加到系统 PATH，或
+   - 设置环境变量 FFMPEG_PATH 指向 ffmpeg.exe（或其所在目录）
+
+没有 ffmpeg 时：界面一般还能打开、预览部分功能可用，但导出/取帧等会失败。
+
+
+三、开发时用过的环境（备查）
+--------------------------
+- Visual Studio 2022（MSVC）
+- Qt 6.12.0 msvc2022_64
+- CMake
+- FFmpeg（系统已安装）
+
+本说明只说明「在哪直接用」；源码与设计见同目录软件设计说明书.txt。

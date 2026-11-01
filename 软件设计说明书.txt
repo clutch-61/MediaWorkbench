@@ -1,0 +1,262 @@
+MediaWorkbench 软件设计说明书
+============================
+课程：面向对象程序设计与实践
+文档类型：概要 / 详细设计说明
+
+
+一、项目概述
+------------
+
+1.1 编写目的
+
+本文档说明 MediaWorkbench（简易音视频处理工具箱）的总体设计、模块划分与接口约定，
+用于指导三人联合开发、联调与验收，并作为课程答辩与文档提交材料。
+
+读者对象：本项目开发人员、课程指导教师、验收人员。
+
+
+1.2 项目背景
+
+待开发软件系统名称：MediaWorkbench（媒体工作台 / 简易音视频处理工具箱）
+
+提出者：课程教学组（面向对象程序设计与实践）
+开发者：三人小组（按模块分工）
+  - A：视频工作台
+  - B：音频工作台
+  - C：图像帧工作台
+用户：课程实验 / 答辩演示用户（本机桌面端）
+
+项目目标：在统一 Qt 界面下，完成视频播放与片段倍速导出、音频波形与处理导出、
+图像滤镜链与批量导出，并体现模块化与面向对象（多态接口、滤镜派生类等）。
+
+
+1.3 定义
+
+| 术语 / 缩写 | 含义 |
+|---|---|
+| MediaWorkbench | 本软件系统名称 |
+| ToolModule | 三个工作台统一抽象基类（界面模块接口） |
+| 界面类 | 各工作台的 ModuleWidget，负责控件与控制流（槽函数调度） |
+| Controller / Core | 模块内部业务协调（播放、参数、滤镜链等） |
+| ExportJob | 导出任务生命周期：Idle→Running→Succeeded/Failed/Cancelled |
+| In / Out | 视频或音频导出选区的起点、终点 |
+| 滤镜链 | 多个 IFrameFilter 按列表顺序依次作用于图像 |
+| artifactReady | 模块成功写出结果文件后发给主程序的信号 |
+| FFmpeg | 开源音视频编解码与处理工具，本项目通过 QProcess 调用 |
+| ffprobe | FFmpeg 套件中的媒体信息探测工具 |
+| Qt Widgets | Qt 桌面控件界面体系（本项目不使用 QML） |
+| QProcess | Qt 异步进程类，用于调用 ffmpeg 且不阻塞界面 |
+
+
+1.4 参考资料
+
+1. 《面向对象程序设计与实践》课程课件（含第八讲：软件模块化设计及联合开发）
+2. 课件「4. 软件文档撰写规范」
+3. 本课程项目要求、验收要求、界面设计说明
+4. Qt 6 官方文档（Widgets / Multimedia）
+5. FFmpeg 官方文档（滤镜、进度输出等）
+
+
+二、总体设计
+------------
+
+2.1 需求规定
+
+（1）功能需求
+
+- 主程序：切换三个工作台；打开文件分发给当前模块；状态栏提示；截帧结果可发送到图像工作台。
+- 视频工作台（A）：加载视频与元数据；播放/暂停/进度/预览倍速；截取当前帧；In/Out 选区；
+  片段 + 真实倍速 + 可选静音导出 MP4；导出进度与取消。
+- 音频工作台（B）：加载音频或视频音轨；波形显示与选区试听；增益、淡入淡出、声道处理；
+  导出 WAV（可选 MP3）；提取整条音轨；导出进度与取消。
+- 图像帧工作台（C）：打开图片或从视频按秒取帧；灰度/反色/亮度/对比度/模糊等滤镜及滤镜链；
+  原图对比、旋转缩放；单图导出与批量导出；批处理可取消。
+
+（2）非功能需求
+
+- 耗时操作（导出、波形分析、取帧等）不得长时间卡住界面。
+- 错误输入（空路径、损坏文件等）应有明确提示，进程不崩溃。
+- 支持含中文、空格的路径（尽量）。
+- 模块可独立 demo 运行，也可嵌入主程序。
+
+（3）运行约束
+
+- 语言：C++17；界面：Qt 6 Widgets；构建：CMake + Visual Studio（MSVC）。
+- 播放预览：Qt Multimedia；离线导出 / 取帧 / 波形解码：本机 FFmpeg（QProcess 调用）。
+- 首版目标平台：Windows x64；三人统一 Qt / 编译器版本。
+- 本系统为本地桌面工具，无网络服务、无登录。
+
+
+2.2 系统架构
+
+整体采用「主程序壳 + 公共契约 + 三个独立模块」结构：
+
+```
+                    ┌─────────────────────┐
+                    │   app / MainWindow  │  文件打开、Tab切换、状态展示
+                    └──────────┬──────────┘
+                               │ 仅依赖 ToolModule*
+           ┌───────────────────┼───────────────────┐
+           ▼                   ▼                   ▼
+    createVideoModule   createAudioModule   createFrameModule
+           │                   │                   │
+    ┌──────┴──────┐     ┌──────┴──────┐     ┌──────┴──────┐
+    │ video 模块   │     │ audio 模块   │     │ frame 模块   │
+    │ Widget界面类 │     │ Widget界面类 │     │ Widget界面类 │
+    │ Controller  │     │ Controller  │     │ Controller  │
+    │ ExportJob   │     │ Analyzer等  │     │ filters/*   │
+    └──────┬──────┘     └──────┬──────┘     └──────┬──────┘
+           └───────────────────┴───────────────────┘
+                               │
+                    contracts（ToolModule / 工厂 / FFmpegHelper …）
+```
+
+层次关系：
+
+- 表现层：MainWindow、各 *ModuleWidget（界面类，掌管本模块控制流）
+- 业务层：*Controller、滤镜链、波形分析等
+- 任务层：*ExportJob（异步导出）
+- 外部工具：FFmpeg / ffprobe
+
+模块间禁止互相 include；协作只通过本地文件路径与 artifactReady 信号。
+
+
+2.3 数据库设计
+
+本系统不使用数据库。
+
+全部数据为本地媒体文件与临时/导出文件；配置仅通过环境变量或程序目录下的
+ffmpeg 路径提示文件（如有）获取。无表结构、无 SQL。
+
+
+三、功能模块设计
+----------------
+
+3.1 主程序模块（app）
+
+- 功能：创建三个工作台 Tab；工具栏「打开文件」「发送到图像工作台」；底部状态栏。
+- 输入：用户选择的文件路径；各模块 statusMessage / artifactReady。
+- 输出：调用当前模块 openFile；切换 Tab 时对离开模块 setActive(false) 暂停试听。
+- 处理：不实现音视频算法，只做调度与展示。
+
+
+3.2 视频工作台（modules/video，A）
+
+- 界面类：VideoModuleWidget（Layout 手写，与 B/C 一致）
+- 业务类：VideoController（播放器、截帧、导出协调）
+- 导出类：VideoExportJob（拼 ffmpeg 参数、进度、取消）
+- 辅助：SegmentSlider（进度条上绘制选区）
+
+主要处理逻辑：
+
+1. 打开文件 → 必要时探测编码 → QMediaPlayer 预览
+2. 截帧：按当前时间用 ffmpeg 抽一帧写入图片文件 → artifactReady(image)
+3. 导出：按 In/Out、导出倍速、是否静音生成参数；视频 setpts、音频 atempo 同步变速
+4. 取消导出时结束进程并删除半成品
+
+输入：视频文件路径、用户操作（播放、In/Out、倍速等）
+输出：预览画面、截帧图片、导出 MP4、状态消息
+
+
+3.3 音频工作台（modules/audio，B）
+
+- 界面类：AudioModuleWidget
+- 业务类：AudioController（探测、参数、校验、生成 ffmpeg 参数）
+- WaveformAnalyzer：ffmpeg 解 PCM，流式计算波形包络
+- WaveformWidget：绘制波形与选区交互
+- AudioExportJob：异步导出，解析 -progress
+
+主要处理逻辑：
+
+1. ffprobe 探测 → 加载试听 → 异步分析波形
+2. 选区试听与导出增益/淡入淡出/声道（试听音量与导出增益分开）
+3. 导出 WAV 或提取整条音轨 → artifactReady(audio)
+
+输入：音频或含音轨视频路径、增益/淡入淡出等参数
+输出：波形界面、处理后的音频文件、状态消息
+
+
+3.4 图像帧工作台（modules/frame，C）
+
+- 界面类：FrameModuleWidget
+- 业务类：FrameController（原图、滤镜列表、旋转缩放、取帧）
+- 滤镜：IFrameFilter 抽象基类 + Gray/Invert/Brightness/Contrast/Blur 派生类
+- 导出：单图 QImage::save；批量循环套用当前滤镜链
+
+主要处理逻辑：
+
+1. 打开图片，或 ffmpeg 按秒从视频取帧
+2. 滤镜链从上到下 apply；上移/下移调整顺序；可看原图对比
+3. 单图/批量导出 PNG/JPG
+
+输入：图片路径或（视频路径 + 秒）；滤镜参数
+输出：预览图、导出图片、状态消息
+
+
+四、接口设计
+------------
+
+4.1 接口设计原则
+
+1. 主程序只依赖公共契约 ToolModule，不依赖各模块内部类（面向接口 / 多态）。
+2. 模块之间不共享播放器指针或内存缓冲区，只传递本地文件路径。
+3. 结果文件必须真实写盘成功后才发 artifactReady。
+4. FFmpeg 通过 QProcess 传参数列表调用，不拼接 shell 命令字符串。
+5. FFmpeg 可执行文件路径由 FFmpegHelper 统一查找（环境变量 / 配置文件 / PATH 等）。
+
+
+4.2 接口实现方式
+
+（1）模块统一接口 ToolModule（contracts/ToolModule.h）
+
+| 成员 | 说明 |
+|---|---|
+| moduleId() | 返回 "video" / "audio" / "frame" |
+| openFile(path) | 打开本地文件；不支持则模块内提示 |
+| setActive(bool) | 切出时暂停预览/试听 |
+| 信号 statusMessage(msg) | 状态栏文案 |
+| 信号 artifactReady(path, kind) | kind 为 "video" / "audio" / "image" |
+
+（2）工厂接口（contracts/ModuleFactories.h）
+
+ToolModule* createVideoModule(QWidget* parent=nullptr);
+ToolModule* createAudioModule(QWidget* parent=nullptr);
+ToolModule* createFrameModule(QWidget* parent=nullptr);
+
+返回对象由 Qt 父子对象管理。
+
+（3）图像滤镜接口（contracts/IFrameFilter.h）
+
+virtual QString name() const;
+virtual QImage apply(const QImage& input) const;
+
+各滤镜派生类实现像素算法；滤镜链依次调用 apply。
+
+（4）导出任务约定
+
+公共基类 ExportJob（B/C 使用）或视频侧等价状态机：
+状态 Idle → Running → Succeeded / Failed / Cancelled；
+提供进度信号与 cancel；失败或取消时清理残缺输出。
+
+（5）与外部 FFmpeg 的调用约定
+
+- 查找：FFmpegHelper::ffmpegPath() / ffprobePath()
+- 抽帧：FFmpegHelper::extractFrame(video, sec, outPath)（同步封装，供图像模块等使用）
+- 导出：各 ExportJob / Controller 生成参数列表后 QProcess::start
+
+调用方式：界面类槽函数 → Controller / ExportJob → QProcess → 完成后发信号回界面 / 主程序。
+
+
+五、附：构建与运行（简要）
+
+依赖：Visual Studio 2022（MSVC）、Qt 6（msvc2022_64）、CMake、本机 FFmpeg。
+
+示例：
+  cmake -S . -B build_vs -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH=<Qt路径>
+  cmake --build build_vs --config Debug
+
+主程序：build_vs\Debug\media_workbench.exe
+独立调试：video_demo / audio_demo / frame_demo
+
+
+文档结束
