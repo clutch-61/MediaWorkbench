@@ -1,0 +1,62 @@
+QWidget {
+    background-color: #1e1e24;
+    color: #e0e0e0;
+    font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+    font-size: 13px;
+}
+QFrame[card="true"] {
+    background-color: #26262e;
+    border-radius: 6px;
+    border: 1px solid #33333d;
+}
+QPushButton {
+    background-color: #3b3b47;
+    border: 1px solid #4a4a5a;
+    border-radius: 4px;
+    padding: 6px 14px;
+    color: #ffffff;
+}
+QPushButton:hover { background-color: #484858; }
+QPushButton:pressed { background-color: #2b2b35; }
+QPushButton:disabled {
+    background-color: #222228;
+    color: #555560;
+}
+QPushButton#primaryButton {
+    background-color: #2563eb;
+    border: 1px solid #3b82f6;
+}
+QPushButton#primaryButton:hover { background-color: #1d4ed8; }
+QSlider::groove:horizontal {
+    height: 4px;
+    background: #3a3a46;
+    border-radius: 2px;
+}
+QSlider::sub-page:horizontal {
+    background: #2563eb;
+    border-radius: 2px;
+}
+QSlider::handle:horizontal {
+    background: #ffffff;
+    width: 12px;
+    margin: -4px 0;
+    border-radius: 6px;
+}
+QProgressBar {
+    border: 1px solid #33333d;
+    border-radius: 4px;
+    background-color: #1a1a20;
+    text-align: center;
+    color: #ffffff;
+}
+QProgressBar::chunk {
+    background-color: #2563eb;
+    border-radius: 3px;
+}
+QTabWidget::pane { border: 1px solid #33333d; }
+QTabBar::tab {
+    background: #26262e;
+    color: #c0c0c0;
+    padding: 8px 16px;
+}
+QTabBar::tab:selected { background: #3b3b47; color: #ffffff; }
