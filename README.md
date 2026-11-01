@@ -32,3 +32,5 @@ build_vs\Debug\media_workbench.exe
 ## æŠ€æœ¯æ ˆ
 
 Windows Â· C++17 Â· Qt 6 Widgets Â· CMake Â· FFmpegï¼ˆQProcess è°ƒç”¨ï¼‰
+
+> ÈýÈË°´ÊÓÆµ / ÒôÆµ / Í¼ÏñÄ£¿é·ÖÖ§ÍêÉÆºóºÏ²¢Áªµ÷¡£
