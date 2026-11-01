@@ -1,0 +1,26 @@
+# 编译产物 / 本地构建
+build_vs/
+build/
+out/
+.vs/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+*.dir/
+x64/
+Debug/
+Release/
+*_autogen/
+
+# Qt / VS 杂项
+*.user
+*.autosave
+*.qmlc
+moc_*.cpp
+ui_*.h
+qrc_*.cpp
+
+# 系统
+Thumbs.db
+Desktop.ini
+.DS_Store
